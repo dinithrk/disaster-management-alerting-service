@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+base-url:
+  context: /disaster-management
+
+spring:
+  application:
+    name: alerts
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/disaster_management
+    username: postgres
+    password: ${DB_PASSWORD}
