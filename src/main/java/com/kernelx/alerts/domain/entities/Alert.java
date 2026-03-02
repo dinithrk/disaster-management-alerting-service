@@ -1,8 +1,6 @@
 package com.kernelx.alerts.domain.entities;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -38,4 +36,7 @@ public class Alert {
 
     //todo: convert strings to enums
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sensorId", referencedColumnName = "sensorId", insertable = false, updatable = false)
+    private Sensor sensor;
 }

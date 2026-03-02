@@ -1,9 +1,6 @@
 package com.kernelx.alerts.domain.entities;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.IdClass;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,4 +27,7 @@ public class SensorReading {
     @Column
     private Double batteryStatus;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sensorId", referencedColumnName = "sensorId", insertable = false, updatable = false)
+    private Sensor sensor;
 }
