@@ -35,7 +35,7 @@ public class AlertsServiceImpl implements AlertsService {
     public String createAlertsForTimeWindow() {
 //        Instant now = Instant.now();
 //        Instant now = Instant.parse("2024-01-01T09:35:00Z");
-        Instant now = Instant.parse("2024-01-01T03:00:00Z");
+        Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
         Instant tenMinutesAgo = now.minus(10, ChronoUnit.MINUTES);
         Instant oneDayAgo = now.minus(1, ChronoUnit.DAYS);
 
@@ -78,34 +78,32 @@ public class AlertsServiceImpl implements AlertsService {
             Double measurement = latestReading.getMeasurement();
             Alert activeAlert = activeAlertMap.get(sensorId);
 
-            String alertType = null;
             String severity = null;
             Double breachedThreshold = null;
 
             // Determine if a threshold is currently exceeded
             if (measurement >= sensor.getThresholdHighCritical()) {
-                alertType = "HIGH_CRITICAL"; severity = "CRITICAL"; breachedThreshold = sensor.getThresholdHighCritical();
+                severity = "HIGH_CRITICAL"; breachedThreshold = sensor.getThresholdHighCritical();
             } else if (measurement >= sensor.getThresholdHighWarning()) {
-                alertType = "HIGH_WARNING"; severity = "WARNING"; breachedThreshold = sensor.getThresholdHighWarning();
+                severity = "HIGH_WARNING"; breachedThreshold = sensor.getThresholdHighWarning();
             } else if (measurement <= sensor.getThresholdLowCritical()) {
-                alertType = "LOW_CRITICAL"; severity = "CRITICAL"; breachedThreshold = sensor.getThresholdLowCritical();
+                severity = "LOW_CRITICAL"; breachedThreshold = sensor.getThresholdLowCritical();
             } else if (measurement <= sensor.getThresholdLowWarning()) {
-                alertType = "LOW_WARNING"; severity = "WARNING"; breachedThreshold = sensor.getThresholdLowWarning();
+                severity = "LOW_WARNING"; breachedThreshold = sensor.getThresholdLowWarning();
             }
 
             // Execute Alert Logic
-            if (alertType != null) {
+            if (severity != null) {
                 // Exceeding threshold: Create new alert if none is active
                 if (activeAlert == null) {
                     Alert newAlert = new Alert(
-                            UUID.randomUUID(), now, sensorId, alertType, severity,
+                            UUID.randomUUID(), now, sensorId, severity,
                             measurement, breachedThreshold, STATUS_ACTIVE, null // null for the Sensor relation mapping
                     );
                     alertRepository.save(newAlert);
                     createdCount++;
-                } else if (!activeAlert.getAlertType().equals(alertType)) {
+                } else if (!activeAlert.getSeverity().equals(severity)) {
                     // Optional: Escalation logic (e.g., Warning became Critical)
-                    activeAlert.setAlertType(alertType);
                     activeAlert.setSeverity(severity);
                     activeAlert.setMeasurement(measurement);
                     activeAlert.setThreshold(breachedThreshold);

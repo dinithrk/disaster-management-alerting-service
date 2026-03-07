@@ -24,8 +24,6 @@ public class Alert {
     @Column(nullable = false)
     private Integer sensorId;
     @Column(nullable = false, length = 32)
-    private String alertType; // enum
-    @Column(nullable = false, length = 32)
     private String severity; // enum
     @Column(nullable = false)
     private Double measurement;
