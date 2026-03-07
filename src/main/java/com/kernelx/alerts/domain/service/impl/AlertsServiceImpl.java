@@ -10,6 +10,7 @@ import com.kernelx.alerts.domain.entities.Alert;
 import com.kernelx.alerts.domain.entities.Sensor;
 import com.kernelx.alerts.domain.entities.SensorReading;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertsServiceImpl implements AlertsService {
 
+    @Value("${alert.time-window-in-mins}")
+    private Long timeWindow;
+
+    @Value("${alert.retention-in-days}")
+    private Long retentionPeriod;
+
     private final AlertRepository alertRepository;
     private final SensorReadingRepository sensorReadingRepository;
     private final SensorRepository sensorRepository;
@@ -32,16 +39,15 @@ public class AlertsServiceImpl implements AlertsService {
     @Transactional
     public String createAlertsForTimeWindow() {
 //        Instant now = Instant.now();
-//        Instant now = Instant.parse("2024-01-01T09:35:00Z");
         Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
-        Instant tenMinutesAgo = now.minus(10, ChronoUnit.MINUTES);
-        Instant oneDayAgo = now.minus(1, ChronoUnit.DAYS);
+        Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
+        Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
         // 1. Cleanup old resolved alerts (keep only 1 day back)
-        alertRepository.deleteByStatusAndTimestampBefore(STATUS_RESOLVED, oneDayAgo);
+        alertRepository.deleteByStatusAndTimestampBefore(AlertStatus.RESOLVED, retentionTime);
 
         // 2. Fetch readings in the 10-minute window
-        List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(tenMinutesAgo, now);
+        List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(timeWindowStart, now);
 
         // 3. Group by Sensor ID and get the LATEST reading to determine current state
         Map<Integer, SensorReading> latestReadingsPerSensor = recentReadings.stream()

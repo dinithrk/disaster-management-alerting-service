@@ -4,6 +4,11 @@ server:
 base-url:
   context: /disaster-management
 
+alert:
+  scheduler-cron: "0 */1 * * * *"
+  time-window-in-mins: 10
+  retention-in-days: 1
+
 spring:
   application:
     name: alerts
