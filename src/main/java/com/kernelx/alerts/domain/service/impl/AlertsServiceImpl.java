@@ -1,5 +1,6 @@
 package com.kernelx.alerts.domain.service.impl;
 
+import com.kernelx.alerts.domain.dto.AlertSeverityDto;
 import com.kernelx.alerts.domain.enums.AlertSeverity;
 import com.kernelx.alerts.domain.enums.AlertStatus;
 import com.kernelx.alerts.domain.service.AlertsService;
@@ -43,13 +44,10 @@ public class AlertsServiceImpl implements AlertsService {
         Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
         Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
-        // 1. Cleanup old resolved alerts (keep only 1 day back)
-        alertRepository.deleteByStatusAndTimestampBefore(AlertStatus.RESOLVED, retentionTime);
-
-        // 2. Fetch readings in the 10-minute window
+        clearResolvedAlerts(retentionTime);
         List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(timeWindowStart, now);
 
-        // 3. Group by Sensor ID and get the LATEST reading to determine current state
+        // Group by Sensor ID and get the LATEST reading to determine current state
         Map<Integer, SensorReading> latestReadingsPerSensor = recentReadings.stream()
                 .collect(Collectors.toMap(
                         SensorReading::getSensorId,
@@ -61,56 +59,39 @@ public class AlertsServiceImpl implements AlertsService {
             return "No readings found in the last 10 minutes.";
         }
 
-        // 4. Fetch the associated sensors and current active alerts
-        List<Sensor> sensors = sensorRepository.findAllById(latestReadingsPerSensor.keySet());
-        Map<Integer, Sensor> sensorMap = sensors.stream().collect(Collectors.toMap(Sensor::getSensorId, s -> s));
-
-        List<Alert> activeAlerts = alertRepository.findByStatus(AlertStatus.ACTIVE);
-        Map<Integer, Alert> activeAlertMap = activeAlerts.stream().collect(Collectors.toMap(Alert::getSensorId, a -> a));
+        Map<Integer, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
+        Map<Integer, Alert> activeAlertMap = getCurrentActiveAlerts();
 
         int createdCount = 0;
         int resolvedCount = 0;
 
-        // 5. Evaluate thresholds
+        // Evaluate thresholds
         for (Map.Entry<Integer, SensorReading> entry : latestReadingsPerSensor.entrySet()) {
             Integer sensorId = entry.getKey();
             SensorReading latestReading = entry.getValue();
-            Sensor sensor = sensorMap.get(sensorId);
+            Sensor sensorMetadata = sensorMetadataMap.get(sensorId);
 
-            if (sensor == null) continue;
+            if (sensorMetadata == null) continue;
 
             Double measurement = latestReading.getMeasurement();
             Alert activeAlert = activeAlertMap.get(sensorId);
 
-            AlertSeverity severity = null;
-            Double breachedThreshold = null;
+            AlertSeverityDto alertSeverityDto = determineMeasurementExceedingThreshold(measurement, sensorMetadata);
 
-            // Determine if a threshold is currently exceeded
-            if (measurement >= sensor.getThresholdHighCritical()) {
-                severity = AlertSeverity.HIGH_CRITICAL; breachedThreshold = sensor.getThresholdHighCritical();
-            } else if (measurement >= sensor.getThresholdHighWarning()) {
-                severity = AlertSeverity.HIGH_WARNING; breachedThreshold = sensor.getThresholdHighWarning();
-            } else if (measurement <= sensor.getThresholdLowCritical()) {
-                severity = AlertSeverity.LOW_CRITICAL; breachedThreshold = sensor.getThresholdLowCritical();
-            } else if (measurement <= sensor.getThresholdLowWarning()) {
-                severity = AlertSeverity.LOW_WARNING; breachedThreshold = sensor.getThresholdLowWarning();
-            }
-
-            // Execute Alert Logic
-            if (severity != null) {
-                // Exceeding threshold: Create new alert if none is active
+            if (alertSeverityDto != null) { // exceeds threshold
                 if (activeAlert == null) {
+                    // create new alert if non exists
                     Alert newAlert = new Alert(
-                            UUID.randomUUID(), now, sensorId, severity,
-                            measurement, breachedThreshold, AlertStatus.ACTIVE, null // null for the Sensor relation mapping
+                            UUID.randomUUID(), now, sensorId, alertSeverityDto.getSeverity(),
+                            measurement, alertSeverityDto.getBreachedThreshold(), AlertStatus.ACTIVE, null // null for the Sensor relation mapping
                     );
                     alertRepository.save(newAlert);
                     createdCount++;
-                } else if (!activeAlert.getSeverity().equals(severity)) {
-                    // Optional: Escalation logic (e.g., Warning became Critical)
-                    activeAlert.setSeverity(severity);
+                } else if (!activeAlert.getSeverity().equals(alertSeverityDto.getSeverity())) {
+                    // Escalation/de-escalation logic
+                    activeAlert.setSeverity(alertSeverityDto.getSeverity());
                     activeAlert.setMeasurement(measurement);
-                    activeAlert.setThreshold(breachedThreshold);
+                    activeAlert.setThreshold(alertSeverityDto.getBreachedThreshold());
                     activeAlert.setTimestamp(now);
                     alertRepository.save(activeAlert);
                 }
@@ -126,5 +107,36 @@ public class AlertsServiceImpl implements AlertsService {
         }
 
         return String.format("Alerts generated: %d created/escalated, %d resolved.", createdCount, resolvedCount);
+    }
+
+    private void clearResolvedAlerts(Instant retentionTime) {
+        alertRepository.deleteByStatusAndTimestampBefore(AlertStatus.RESOLVED, retentionTime);
+    }
+
+    private Map<Integer, Sensor> getSensorMetadata(Map<Integer, SensorReading> latestReadingsPerSensor) {
+        List<Sensor> sensors = sensorRepository.findAllById(latestReadingsPerSensor.keySet());
+        return sensors.stream().collect(Collectors.toMap(Sensor::getSensorId, s -> s));
+    }
+
+    private Map<Integer, Alert> getCurrentActiveAlerts() {
+        List<Alert> activeAlerts = alertRepository.findByStatus(AlertStatus.ACTIVE);
+        return activeAlerts.stream().collect(Collectors.toMap(Alert::getSensorId, a -> a));
+    }
+
+    private AlertSeverityDto determineMeasurementExceedingThreshold(Double measurement, Sensor sensorMetadata) {
+
+        AlertSeverityDto alertSeverityDto = null;
+
+        if (measurement >= sensorMetadata.getThresholdHighCritical()) {
+            alertSeverityDto = new AlertSeverityDto(AlertSeverity.HIGH_CRITICAL, sensorMetadata.getThresholdHighCritical());
+        } else if (measurement >= sensorMetadata.getThresholdHighWarning()) {
+            alertSeverityDto = new AlertSeverityDto(AlertSeverity.HIGH_WARNING, sensorMetadata.getThresholdHighWarning());
+        } else if (measurement <= sensorMetadata.getThresholdLowCritical()) {
+            alertSeverityDto = new AlertSeverityDto(AlertSeverity.LOW_CRITICAL, sensorMetadata.getThresholdLowCritical());
+        } else if (measurement <= sensorMetadata.getThresholdLowWarning()) {
+            alertSeverityDto = new AlertSeverityDto(AlertSeverity.LOW_WARNING, sensorMetadata.getThresholdLowWarning());
+        }
+
+        return alertSeverityDto;
     }
 }
