@@ -1,5 +1,7 @@
 package com.kernelx.alerts.domain.entities;
 
+import com.kernelx.alerts.domain.enums.AlertSeverity;
+import com.kernelx.alerts.domain.enums.AlertStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,16 +25,16 @@ public class Alert {
     private Instant timestamp;
     @Column(nullable = false)
     private Integer sensorId;
+    @Enumerated(value = EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private String severity; // enum
+    private AlertSeverity severity;
     @Column(nullable = false)
     private Double measurement;
     @Column(nullable = false)
     private Double threshold;
+    @Enumerated(value = EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private String status; // enum
-
-    //todo: convert strings to enums
+    private AlertStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sensorId", referencedColumnName = "sensorId", insertable = false, updatable = false)

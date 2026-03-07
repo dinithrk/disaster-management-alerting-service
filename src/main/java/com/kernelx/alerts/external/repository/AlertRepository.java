@@ -1,6 +1,7 @@
 package com.kernelx.alerts.external.repository;
 
 import com.kernelx.alerts.domain.entities.Alert;
+import com.kernelx.alerts.domain.enums.AlertStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,7 +12,7 @@ import java.util.UUID;
 @Repository
 public interface AlertRepository extends JpaRepository<Alert, UUID> {
 
-    List<Alert> findByStatus(String status);
+    List<Alert> findByStatus(AlertStatus status);
 
-    void deleteByStatusAndTimestampBefore(String status, Instant timestamp);
+    void deleteByStatusAndTimestampBefore(AlertStatus status, Instant timestamp);
 }

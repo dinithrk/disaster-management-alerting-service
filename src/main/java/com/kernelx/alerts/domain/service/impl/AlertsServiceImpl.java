@@ -1,5 +1,7 @@
 package com.kernelx.alerts.domain.service.impl;
 
+import com.kernelx.alerts.domain.enums.AlertSeverity;
+import com.kernelx.alerts.domain.enums.AlertStatus;
 import com.kernelx.alerts.domain.service.AlertsService;
 import com.kernelx.alerts.external.repository.AlertRepository;
 import com.kernelx.alerts.external.repository.SensorReadingRepository;
@@ -25,10 +27,6 @@ public class AlertsServiceImpl implements AlertsService {
     private final AlertRepository alertRepository;
     private final SensorReadingRepository sensorReadingRepository;
     private final SensorRepository sensorRepository;
-
-    // Constants to replace your Strings (until you convert them to Enums)
-    private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String STATUS_RESOLVED = "RESOLVED";
 
     @Override
     @Transactional
@@ -61,7 +59,7 @@ public class AlertsServiceImpl implements AlertsService {
         List<Sensor> sensors = sensorRepository.findAllById(latestReadingsPerSensor.keySet());
         Map<Integer, Sensor> sensorMap = sensors.stream().collect(Collectors.toMap(Sensor::getSensorId, s -> s));
 
-        List<Alert> activeAlerts = alertRepository.findByStatus(STATUS_ACTIVE);
+        List<Alert> activeAlerts = alertRepository.findByStatus(AlertStatus.ACTIVE);
         Map<Integer, Alert> activeAlertMap = activeAlerts.stream().collect(Collectors.toMap(Alert::getSensorId, a -> a));
 
         int createdCount = 0;
@@ -78,18 +76,18 @@ public class AlertsServiceImpl implements AlertsService {
             Double measurement = latestReading.getMeasurement();
             Alert activeAlert = activeAlertMap.get(sensorId);
 
-            String severity = null;
+            AlertSeverity severity = null;
             Double breachedThreshold = null;
 
             // Determine if a threshold is currently exceeded
             if (measurement >= sensor.getThresholdHighCritical()) {
-                severity = "HIGH_CRITICAL"; breachedThreshold = sensor.getThresholdHighCritical();
+                severity = AlertSeverity.HIGH_CRITICAL; breachedThreshold = sensor.getThresholdHighCritical();
             } else if (measurement >= sensor.getThresholdHighWarning()) {
-                severity = "HIGH_WARNING"; breachedThreshold = sensor.getThresholdHighWarning();
+                severity = AlertSeverity.HIGH_WARNING; breachedThreshold = sensor.getThresholdHighWarning();
             } else if (measurement <= sensor.getThresholdLowCritical()) {
-                severity = "LOW_CRITICAL"; breachedThreshold = sensor.getThresholdLowCritical();
+                severity = AlertSeverity.LOW_CRITICAL; breachedThreshold = sensor.getThresholdLowCritical();
             } else if (measurement <= sensor.getThresholdLowWarning()) {
-                severity = "LOW_WARNING"; breachedThreshold = sensor.getThresholdLowWarning();
+                severity = AlertSeverity.LOW_WARNING; breachedThreshold = sensor.getThresholdLowWarning();
             }
 
             // Execute Alert Logic
@@ -98,7 +96,7 @@ public class AlertsServiceImpl implements AlertsService {
                 if (activeAlert == null) {
                     Alert newAlert = new Alert(
                             UUID.randomUUID(), now, sensorId, severity,
-                            measurement, breachedThreshold, STATUS_ACTIVE, null // null for the Sensor relation mapping
+                            measurement, breachedThreshold, AlertStatus.ACTIVE, null // null for the Sensor relation mapping
                     );
                     alertRepository.save(newAlert);
                     createdCount++;
@@ -113,7 +111,7 @@ public class AlertsServiceImpl implements AlertsService {
             } else {
                 // Normal state: Resolve if there's an active alert
                 if (activeAlert != null) {
-                    activeAlert.setStatus(STATUS_RESOLVED);
+                    activeAlert.setStatus(AlertStatus.RESOLVED);
                     activeAlert.setTimestamp(now); // Mark the exact time it was resolved
                     alertRepository.save(activeAlert);
                     resolvedCount++;
