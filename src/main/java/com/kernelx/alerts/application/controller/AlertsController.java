@@ -1,5 +1,6 @@
 package com.kernelx.alerts.application.controller;
 
+import com.kernelx.alerts.domain.exception.ServerException;
 import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ public class AlertsController {
 
 
     @GetMapping("/create")
-    public ResponseEntity<CreateAlertResponse> createAlerts() {
+    public ResponseEntity<CreateAlertResponse> createAlerts() throws ServerException {
         log.info("Request received to create alert");
 
         CreateAlertResponse response = alertsService.createAlertsForTimeWindow();

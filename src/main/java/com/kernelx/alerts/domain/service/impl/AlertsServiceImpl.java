@@ -5,6 +5,7 @@ import com.kernelx.alerts.domain.entities.Sensor;
 import com.kernelx.alerts.domain.entities.SensorReading;
 import com.kernelx.alerts.domain.enums.AlertSeverity;
 import com.kernelx.alerts.domain.enums.AlertStatus;
+import com.kernelx.alerts.domain.exception.ServerException;
 import com.kernelx.alerts.domain.model.dto.AlertSeverityDto;
 import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
@@ -12,6 +13,7 @@ import com.kernelx.alerts.external.repository.AlertRepository;
 import com.kernelx.alerts.external.repository.SensorReadingRepository;
 import com.kernelx.alerts.external.repository.SensorRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlertsServiceImpl implements AlertsService {
@@ -39,75 +42,85 @@ public class AlertsServiceImpl implements AlertsService {
 
     @Override
     @Transactional
-    public CreateAlertResponse createAlertsForTimeWindow() {
-//        Instant now = Instant.now();
-        Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
-        Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
-        Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
+    public CreateAlertResponse createAlertsForTimeWindow() throws ServerException {
 
-        clearResolvedAlerts(retentionTime);
-        List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(timeWindowStart, now);
+        try {
+            //        Instant now = Instant.now();
+            Instant now = Instant.parse("2024-01-01T08:30:00Z"); // 12:00 PM IST
+            Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
+            Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
-        // Group by Sensor ID and get the LATEST reading to determine current state
-        Map<Integer, SensorReading> latestReadingsPerSensor = recentReadings.stream()
-                .collect(Collectors.toMap(
-                        SensorReading::getSensorId,
-                        reading -> reading,
-                        (existing, replacement) -> existing.getTimestamp().isAfter(replacement.getTimestamp()) ? existing : replacement
-                ));
+            clearResolvedAlerts(retentionTime);
+            List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(timeWindowStart, now);
 
-        if (latestReadingsPerSensor.isEmpty()) {
-            return new CreateAlertResponse(null, null, "No readings found in the current time window");
-        }
+            // Group by Sensor ID and get the LATEST reading to determine current state
+            Map<Integer, SensorReading> latestReadingsPerSensor = recentReadings.stream()
+                    .collect(Collectors.toMap(
+                            SensorReading::getSensorId,
+                            reading -> reading,
+                            (existing, replacement) -> existing.getTimestamp().isAfter(replacement.getTimestamp()) ? existing : replacement
+                    ));
 
-        Map<Integer, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
-        Map<Integer, Alert> activeAlertMap = getCurrentActiveAlerts();
+            if (latestReadingsPerSensor.isEmpty()) {
+                String notFoundMsg = "No readings found in the current time window";
+                log.info(notFoundMsg);
+                return new CreateAlertResponse(null, null, notFoundMsg);
+            }
 
-        int createdCount = 0;
-        int resolvedCount = 0;
+            Map<Integer, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
+            Map<Integer, Alert> activeAlertMap = getCurrentActiveAlerts();
 
-        // Evaluate thresholds
-        for (Map.Entry<Integer, SensorReading> entry : latestReadingsPerSensor.entrySet()) {
-            Integer sensorId = entry.getKey();
-            SensorReading latestReading = entry.getValue();
-            Sensor sensorMetadata = sensorMetadataMap.get(sensorId);
+            int createdCount = 0;
+            int resolvedCount = 0;
 
-            if (sensorMetadata == null) continue;
+            // Evaluate thresholds
+            for (Map.Entry<Integer, SensorReading> entry : latestReadingsPerSensor.entrySet()) {
+                Integer sensorId = entry.getKey();
+                SensorReading latestReading = entry.getValue();
+                Sensor sensorMetadata = sensorMetadataMap.get(sensorId);
 
-            Double measurement = latestReading.getMeasurement();
-            Alert activeAlert = activeAlertMap.get(sensorId);
+                if (sensorMetadata == null) continue;
 
-            AlertSeverityDto alertSeverityDto = determineMeasurementExceedingThreshold(measurement, sensorMetadata);
+                Double measurement = latestReading.getMeasurement();
+                Alert activeAlert = activeAlertMap.get(sensorId);
 
-            if (alertSeverityDto != null) { // exceeds threshold
-                if (activeAlert == null) {
-                    // create new alert if non exists
-                    Alert newAlert = new Alert(
-                            UUID.randomUUID(), now, now, sensorId, alertSeverityDto.getSeverity(),
-                            measurement, alertSeverityDto.getBreachedThreshold(), AlertStatus.ACTIVE, null // null for the Sensor relation mapping
-                    );
-                    alertRepository.save(newAlert);
-                    createdCount++;
-                } else if (!activeAlert.getSeverity().equals(alertSeverityDto.getSeverity())) {
-                    // Escalation/de-escalation logic
-                    activeAlert.setSeverity(alertSeverityDto.getSeverity());
-                    activeAlert.setMeasurement(measurement);
-                    activeAlert.setThreshold(alertSeverityDto.getBreachedThreshold());
-                    activeAlert.setTimestamp(now);
-                    alertRepository.save(activeAlert);
-                }
-            } else {
-                // Normal state: Resolve if there's an active alert
-                if (activeAlert != null) {
-                    activeAlert.setStatus(AlertStatus.RESOLVED);
-                    activeAlert.setTimestamp(now); // Mark the exact time it was resolved
-                    alertRepository.save(activeAlert);
-                    resolvedCount++;
+                AlertSeverityDto alertSeverityDto = determineMeasurementExceedingThreshold(measurement, sensorMetadata);
+
+                if (alertSeverityDto != null) { // exceeds threshold
+                    if (activeAlert == null) {
+                        // create new alert if non exists
+                        Alert newAlert = new Alert(
+                                UUID.randomUUID(), now, now, sensorId, alertSeverityDto.getSeverity(),
+                                measurement, alertSeverityDto.getBreachedThreshold(), AlertStatus.ACTIVE, null // null for the Sensor relation mapping
+                        );
+                        alertRepository.save(newAlert);
+                        createdCount++;
+                    } else if (!activeAlert.getSeverity().equals(alertSeverityDto.getSeverity())) {
+                        // Escalation/de-escalation logic
+                        activeAlert.setSeverity(alertSeverityDto.getSeverity());
+                        activeAlert.setMeasurement(measurement);
+                        activeAlert.setThreshold(alertSeverityDto.getBreachedThreshold());
+                        activeAlert.setTimestamp(now);
+                        alertRepository.save(activeAlert);
+                    }
+                } else {
+                    // Normal state: Resolve if there's an active alert
+                    if (activeAlert != null) {
+                        activeAlert.setStatus(AlertStatus.RESOLVED);
+                        activeAlert.setTimestamp(now); // Mark the exact time it was resolved
+                        alertRepository.save(activeAlert);
+                        resolvedCount++;
+                    }
                 }
             }
+
+            return new CreateAlertResponse(createdCount, resolvedCount, "Alert generation scheduler executed Successfully");
+        } catch (Exception ex) {
+            String errMsg = "Error occurred while executing Alert scheduler: " + ex.getMessage();
+            log.error(errMsg);
+            throw new ServerException(errMsg);
         }
 
-        return new CreateAlertResponse(createdCount, resolvedCount, "Alert generation scheduler executed Successfully");
     }
 
     private void clearResolvedAlerts(Instant retentionTime) {
