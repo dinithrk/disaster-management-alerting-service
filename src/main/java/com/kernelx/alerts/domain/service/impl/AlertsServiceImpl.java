@@ -1,15 +1,16 @@
 package com.kernelx.alerts.domain.service.impl;
 
-import com.kernelx.alerts.domain.dto.AlertSeverityDto;
+import com.kernelx.alerts.domain.entities.Alert;
+import com.kernelx.alerts.domain.entities.Sensor;
+import com.kernelx.alerts.domain.entities.SensorReading;
 import com.kernelx.alerts.domain.enums.AlertSeverity;
 import com.kernelx.alerts.domain.enums.AlertStatus;
+import com.kernelx.alerts.domain.model.dto.AlertSeverityDto;
+import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
 import com.kernelx.alerts.external.repository.AlertRepository;
 import com.kernelx.alerts.external.repository.SensorReadingRepository;
 import com.kernelx.alerts.external.repository.SensorRepository;
-import com.kernelx.alerts.domain.entities.Alert;
-import com.kernelx.alerts.domain.entities.Sensor;
-import com.kernelx.alerts.domain.entities.SensorReading;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,7 @@ public class AlertsServiceImpl implements AlertsService {
 
     @Override
     @Transactional
-    public String createAlertsForTimeWindow() {
+    public CreateAlertResponse createAlertsForTimeWindow() {
 //        Instant now = Instant.now();
         Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
         Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
@@ -56,7 +57,7 @@ public class AlertsServiceImpl implements AlertsService {
                 ));
 
         if (latestReadingsPerSensor.isEmpty()) {
-            return "No readings found in the last 10 minutes.";
+            return new CreateAlertResponse(null, null, "No readings found in the current time window");
         }
 
         Map<Integer, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
@@ -106,7 +107,7 @@ public class AlertsServiceImpl implements AlertsService {
             }
         }
 
-        return String.format("Alerts generated: %d created/escalated, %d resolved.", createdCount, resolvedCount);
+        return new CreateAlertResponse(createdCount, resolvedCount, "Alert generation scheduler executed Successfully");
     }
 
     private void clearResolvedAlerts(Instant retentionTime) {

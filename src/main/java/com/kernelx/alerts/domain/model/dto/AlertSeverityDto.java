@@ -1,4 +1,4 @@
-package com.kernelx.alerts.domain.dto;
+package com.kernelx.alerts.domain.model.dto;
 
 import com.kernelx.alerts.domain.enums.AlertSeverity;
 import lombok.AllArgsConstructor;

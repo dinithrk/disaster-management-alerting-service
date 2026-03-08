@@ -1,5 +1,6 @@
 package com.kernelx.alerts.application.scheduler;
 
+import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ public class AlertScheduler {
     public void scheduleAlertGeneration() {
         log.info("Starting scheduled alert generation");
 
-        String result = alertsService.createAlertsForTimeWindow();
+        CreateAlertResponse result = alertsService.createAlertsForTimeWindow();
         log.info("Finished scheduled alert generation: {}", result);
     }
 }
