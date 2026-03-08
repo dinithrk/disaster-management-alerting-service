@@ -24,6 +24,8 @@ public class Alert {
     @Column(nullable = false)
     private Instant timestamp;
     @Column(nullable = false)
+    private Instant firstCreatedAt;
+    @Column(nullable = false)
     private Integer sensorId;
     @Enumerated(value = EnumType.STRING)
     @Column(nullable = false, length = 32)

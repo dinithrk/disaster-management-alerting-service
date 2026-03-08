@@ -82,7 +82,7 @@ public class AlertsServiceImpl implements AlertsService {
                 if (activeAlert == null) {
                     // create new alert if non exists
                     Alert newAlert = new Alert(
-                            UUID.randomUUID(), now, sensorId, alertSeverityDto.getSeverity(),
+                            UUID.randomUUID(), now, now, sensorId, alertSeverityDto.getSeverity(),
                             measurement, alertSeverityDto.getBreachedThreshold(), AlertStatus.ACTIVE, null // null for the Sensor relation mapping
                     );
                     alertRepository.save(newAlert);
