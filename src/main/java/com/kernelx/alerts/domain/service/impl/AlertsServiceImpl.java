@@ -7,6 +7,7 @@ import com.kernelx.alerts.domain.enums.AlertSeverity;
 import com.kernelx.alerts.domain.enums.AlertStatus;
 import com.kernelx.alerts.domain.exception.ServerException;
 import com.kernelx.alerts.domain.model.dto.AlertSeverityDto;
+import com.kernelx.alerts.domain.model.response.ActiveAlertResponse;
 import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
 import com.kernelx.alerts.external.repository.AlertRepository;
@@ -46,7 +47,7 @@ public class AlertsServiceImpl implements AlertsService {
 
         try {
             //        Instant now = Instant.now();
-            Instant now = Instant.parse("2024-01-01T08:30:00Z"); // 12:00 PM IST
+            Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
             Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
             Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
@@ -152,5 +153,33 @@ public class AlertsServiceImpl implements AlertsService {
         }
 
         return alertSeverityDto;
+    }
+
+    @Override
+    public List<ActiveAlertResponse> getActiveAlerts() throws ServerException {
+        try{
+            List<Alert> activeAlertEntityList = alertRepository.findByStatus(AlertStatus.ACTIVE);
+            return activeAlertEntityList.stream()
+                    .map(this::mapAlertEntityToResponse)
+                    .toList();
+        } catch (Exception ex) {
+            String errMsg = "Error occurred while fetching active alerts: " + ex.getMessage();
+            log.error(errMsg);
+            throw new ServerException(errMsg);
+        }
+    }
+
+    private ActiveAlertResponse mapAlertEntityToResponse(Alert alertEntity) {
+
+        ActiveAlertResponse activeAlertResponse = new ActiveAlertResponse();
+        activeAlertResponse.setAlertId(alertEntity.getAlertId());
+        activeAlertResponse.setTimestamp(alertEntity.getTimestamp());
+        activeAlertResponse.setFirstCreatedAt(alertEntity.getFirstCreatedAt());
+        activeAlertResponse.setSensorId(alertEntity.getSensorId());
+        activeAlertResponse.setSeverity(alertEntity.getSeverity());
+        activeAlertResponse.setMeasurement(alertEntity.getMeasurement());
+        activeAlertResponse.setThreshold(alertEntity.getThreshold());
+
+        return activeAlertResponse;
     }
 }

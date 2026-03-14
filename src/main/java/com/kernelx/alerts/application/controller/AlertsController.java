@@ -1,6 +1,7 @@
 package com.kernelx.alerts.application.controller;
 
 import com.kernelx.alerts.domain.exception.ServerException;
+import com.kernelx.alerts.domain.model.response.ActiveAlertResponse;
 import com.kernelx.alerts.domain.model.response.CreateAlertResponse;
 import com.kernelx.alerts.domain.service.AlertsService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -26,6 +29,15 @@ public class AlertsController {
 
         CreateAlertResponse response = alertsService.createAlertsForTimeWindow();
         log.info("Sending response {}", response);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<List<ActiveAlertResponse>> getActiveAlerts() throws ServerException {
+        log.info("Fetching ACTIVE alerts");
+
+        List<ActiveAlertResponse> response = alertsService.getActiveAlerts();
+        log.info("Sending response for {} active alerts", response.size());
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
