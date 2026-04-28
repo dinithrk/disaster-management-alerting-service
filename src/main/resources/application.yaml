@@ -1,8 +1,13 @@
 server:
-  port: 8080
+  port: 8093
 
 base-url:
   context: /disaster-management
+
+alert:
+  scheduler-cron: "0 */1 * * * *"
+  time-window-in-mins: 10
+  retention-in-days: 1
 
 spring:
   application:
@@ -18,6 +23,6 @@ spring:
         format_sql: true
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/disaster_management
-    username: postgres
+    url: jdbc:postgresql://localhost:5432/kernelx
+    username: kernelx
     password: ${DB_PASSWORD}
