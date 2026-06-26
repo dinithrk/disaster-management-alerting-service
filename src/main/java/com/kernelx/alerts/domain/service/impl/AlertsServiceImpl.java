@@ -46,8 +46,8 @@ public class AlertsServiceImpl implements AlertsService {
     public CreateAlertResponse createAlertsForTimeWindow() throws ServerException {
 
         try {
-            Instant now = Instant.now();
-            //Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
+//            Instant now = Instant.now();
+            Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
             Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
             Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
@@ -55,7 +55,7 @@ public class AlertsServiceImpl implements AlertsService {
             List<SensorReading> recentReadings = sensorReadingRepository.findByTimestampBetween(timeWindowStart, now);
 
             // Group by Sensor ID and get the LATEST reading to determine current state
-            Map<Integer, SensorReading> latestReadingsPerSensor = recentReadings.stream()
+            Map<String, SensorReading> latestReadingsPerSensor = recentReadings.stream()
                     .collect(Collectors.toMap(
                             SensorReading::getSensorId,
                             reading -> reading,
@@ -68,15 +68,15 @@ public class AlertsServiceImpl implements AlertsService {
                 return new CreateAlertResponse(null, null, notFoundMsg);
             }
 
-            Map<Integer, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
-            Map<Integer, Alert> activeAlertMap = getCurrentActiveAlerts();
+            Map<String, Sensor> sensorMetadataMap = getSensorMetadata(latestReadingsPerSensor);
+            Map<String, Alert> activeAlertMap = getCurrentActiveAlerts();
 
             int createdCount = 0;
             int resolvedCount = 0;
 
             // Evaluate thresholds
-            for (Map.Entry<Integer, SensorReading> entry : latestReadingsPerSensor.entrySet()) {
-                Integer sensorId = entry.getKey();
+            for (Map.Entry<String, SensorReading> entry : latestReadingsPerSensor.entrySet()) {
+                String sensorId = entry.getKey();
                 SensorReading latestReading = entry.getValue();
                 Sensor sensorMetadata = sensorMetadataMap.get(sensorId);
 
@@ -96,12 +96,17 @@ public class AlertsServiceImpl implements AlertsService {
                         );
                         alertRepository.save(newAlert);
                         createdCount++;
-                    } else if (!activeAlert.getSeverity().equals(alertSeverityDto.getSeverity())) {
-                        // Escalation/de-escalation logic
-                        activeAlert.setSeverity(alertSeverityDto.getSeverity());
+                    } else {
+                        // Always update the latest measurement and timestamp for an active alert
                         activeAlert.setMeasurement(measurement);
-                        activeAlert.setThreshold(alertSeverityDto.getBreachedThreshold());
                         activeAlert.setTimestamp(now);
+
+                        // Escalation/de-escalation logic: update severity and threshold if they changed
+                        if (!activeAlert.getSeverity().equals(alertSeverityDto.getSeverity())) {
+                            activeAlert.setSeverity(alertSeverityDto.getSeverity());
+                            activeAlert.setThreshold(alertSeverityDto.getBreachedThreshold());
+                        }
+
                         alertRepository.save(activeAlert);
                     }
                 } else {
@@ -128,12 +133,12 @@ public class AlertsServiceImpl implements AlertsService {
         alertRepository.deleteByStatusAndTimestampBefore(AlertStatus.RESOLVED, retentionTime);
     }
 
-    private Map<Integer, Sensor> getSensorMetadata(Map<Integer, SensorReading> latestReadingsPerSensor) {
+    private Map<String, Sensor> getSensorMetadata(Map<String, SensorReading> latestReadingsPerSensor) {
         List<Sensor> sensors = sensorRepository.findAllById(latestReadingsPerSensor.keySet());
         return sensors.stream().collect(Collectors.toMap(Sensor::getSensorId, s -> s));
     }
 
-    private Map<Integer, Alert> getCurrentActiveAlerts() {
+    private Map<String, Alert> getCurrentActiveAlerts() {
         List<Alert> activeAlerts = alertRepository.findByStatus(AlertStatus.ACTIVE);
         return activeAlerts.stream().collect(Collectors.toMap(Alert::getSensorId, a -> a));
     }
