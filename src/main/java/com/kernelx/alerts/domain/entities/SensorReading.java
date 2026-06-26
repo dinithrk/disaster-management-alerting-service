@@ -25,7 +25,7 @@ public class SensorReading {
     @Column(nullable = false)
     private Double measurement;
     @Column
-    private Double batteryStatus;
+    private Double sensorHealth;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sensorId", referencedColumnName = "sensorId", insertable = false, updatable = false)
