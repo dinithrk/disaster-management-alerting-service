@@ -14,6 +14,6 @@ import java.time.Instant;
 @EqualsAndHashCode
 public class SensorDataId implements Serializable {
 
-    private Integer sensorId;
+    private String sensorId;
     private Instant timestamp;
 }

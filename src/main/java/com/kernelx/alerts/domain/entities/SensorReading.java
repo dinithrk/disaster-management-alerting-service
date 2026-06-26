@@ -18,7 +18,7 @@ public class SensorReading {
 
     @Id
     @Column(nullable = false)
-    private Integer sensorId;
+    private String sensorId;
     @Id
     @Column(nullable = false)
     private Instant timestamp;

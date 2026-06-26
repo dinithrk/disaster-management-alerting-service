@@ -18,7 +18,7 @@ public class Sensor {
 
     @Id
     @Column(nullable = false)
-    private Integer sensorId;
+    private String sensorId;
     @Column(nullable = false)
     private Integer sensorTypeId;
     @Column(nullable = false)

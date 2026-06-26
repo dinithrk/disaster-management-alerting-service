@@ -26,7 +26,7 @@ public class Alert {
     @Column(nullable = false)
     private Instant firstCreatedAt;
     @Column(nullable = false)
-    private Integer sensorId;
+    private String sensorId;
     @Enumerated(value = EnumType.STRING)
     @Column(nullable = false, length = 32)
     private AlertSeverity severity;

@@ -16,7 +16,7 @@ public class ActiveAlertResponse {
     private UUID alertId;
     private Instant timestamp;
     private Instant firstCreatedAt;
-    private Integer sensorId;
+    private String sensorId;
     private AlertSeverity severity;
     private Double measurement;
     private Double threshold;
