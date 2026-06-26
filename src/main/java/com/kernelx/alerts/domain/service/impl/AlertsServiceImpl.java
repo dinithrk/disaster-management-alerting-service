@@ -46,8 +46,8 @@ public class AlertsServiceImpl implements AlertsService {
     public CreateAlertResponse createAlertsForTimeWindow() throws ServerException {
 
         try {
-//            Instant now = Instant.now();
-            Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
+            Instant now = Instant.now();
+            //Instant now = Instant.parse("2024-01-01T06:30:00Z"); // 12:00 PM IST
             Instant timeWindowStart = now.minus(timeWindow, ChronoUnit.MINUTES);
             Instant retentionTime = now.minus(retentionPeriod, ChronoUnit.DAYS);
 
