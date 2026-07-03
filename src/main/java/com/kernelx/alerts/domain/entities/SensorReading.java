@@ -24,8 +24,10 @@ public class SensorReading {
     private Instant timestamp;
     @Column(nullable = false)
     private Double measurement;
+//    @Column
+//    private Double sensorHealth;
     @Column
-    private Double sensorHealth;
+    private Integer batteryStatus;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sensorId", referencedColumnName = "sensorId", insertable = false, updatable = false)
